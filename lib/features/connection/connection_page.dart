@@ -23,7 +23,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
   bool _loadingPaired = true;
   bool _scanning = false;
   String? _busyAddress; // dispositivo sendo pareado ou conectado agora
-  String? _connectedAddress;
+  String? _connectedAddress = obdConnection.value;
   String? _error;
 
   @override
@@ -137,6 +137,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
       await obdTransport.connect(device.address);
       await elm327.init();
       if (!mounted) return;
+      obdConnection.value = device.address;
       setState(() => _connectedAddress = device.address);
     } catch (e) {
       await obdTransport.disconnect();
@@ -148,6 +149,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
 
   Future<void> _disconnect() async {
     await obdTransport.disconnect();
+    obdConnection.value = null;
     if (!mounted) return;
     setState(() => _connectedAddress = null);
   }
