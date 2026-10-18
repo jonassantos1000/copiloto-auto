@@ -1,10 +1,13 @@
 ﻿import 'dart:math' as math;
 
+import '../connection/connection_status_pill.dart';
+
 import 'package:flutter/material.dart';
-import '../connection/connection_page.dart';
+
 import '../../core/app_services.dart';
 import '../../core/app_theme.dart';
 import '../../core/health_score.dart';
+import '../connection/connection_page.dart';
 
 /// Tela principal. Lê o telemetryStore (alimentado pelo telemetryBus).
 /// Sem dados, mostra "--". O botão de play liga a simulação.
@@ -69,20 +72,12 @@ class _DashboardPageState extends State<DashboardPage> {
                           const SizedBox(height: 4),
                           Text(
                             'Veja como está seu carro hoje',
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(color: muted),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: muted,
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                                        IconButton.filledTonal(
-                      tooltip: 'Conexão OBD2',
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ConnectionPage(),
-                        ),
-                      ),
-                      icon: const Icon(Icons.bluetooth_rounded),
                     ),
                     const SizedBox(width: 8),
                     IconButton.filledTonal(
@@ -100,8 +95,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     IconButton.filledTonal(
                       tooltip: 'Alternar tema',
                       onPressed: () {
-                        AppTheme.themeMode.value =
-                            isDark ? ThemeMode.light : ThemeMode.dark;
+                        AppTheme.themeMode.value = isDark
+                            ? ThemeMode.light
+                            : ThemeMode.dark;
                       },
                       icon: Icon(
                         isDark
@@ -112,7 +108,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   ],
                 ),
                 const SizedBox(height: 20),
-
+                const ConnectionStatusPill(),
+                const SizedBox(height: 10),
                 _HealthCard(report: report, live: store.live.value),
                 const SizedBox(height: 24),
 
@@ -233,9 +230,8 @@ class _HealthCard extends StatelessWidget {
               ),
             ],
           )
-        : AppTheme.cardDecoration(context).copyWith(
-            borderRadius: BorderRadius.circular(28),
-          );
+        : AppTheme.cardDecoration(context)
+              .copyWith(borderRadius: BorderRadius.circular(28));
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -301,8 +297,9 @@ class _Gauge extends StatelessWidget {
       duration: const Duration(milliseconds: 1200),
       curve: Curves.easeOutCubic,
       builder: (context, value, _) {
-        final arcColor =
-            score == null ? Colors.grey : healthColor(value.round());
+        final arcColor = score == null
+            ? Colors.grey
+            : healthColor(value.round());
 
         return SizedBox(
           width: 180,
@@ -314,14 +311,16 @@ class _Gauge extends StatelessWidget {
               isDark: isDark,
             ),
             child: Center(
-              child: Text(
-                score == null ? '--' : '${value.round()}%',
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 44,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              child: score == null
+                  ? _GaugeConnectButton(isDark: isDark)
+                  : Text(
+                      '${value.round()}%',
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 44,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
             ),
           ),
         );
@@ -372,7 +371,12 @@ class _GaugePainter extends CustomPainter {
 
     canvas.drawArc(rect, startAngle, fullSweep, false, track);
     canvas.drawArc(
-        rect, startAngle, fullSweep * progress, false, progressPaint);
+      rect,
+      startAngle,
+      fullSweep * progress,
+      false,
+      progressPaint,
+    );
   }
 
   @override
@@ -531,18 +535,18 @@ class _ErrorsTile extends StatelessWidget {
     final color = unknown
         ? Colors.grey
         : ok
-            ? const Color(0xFF22C55E)
-            : const Color(0xFFEF4444);
+        ? const Color(0xFF22C55E)
+        : const Color(0xFFEF4444);
     final icon = unknown
         ? Icons.help_outline_rounded
         : ok
-            ? Icons.check_circle_rounded
-            : Icons.warning_rounded;
+        ? Icons.check_circle_rounded
+        : Icons.warning_rounded;
     final title = unknown
         ? 'Erros ainda não lidos'
         : ok
-            ? 'Nenhum erro na ECU'
-            : '$errorCount erro(s) na ECU';
+        ? 'Nenhum erro na ECU'
+        : '$errorCount erro(s) na ECU';
     final subtitle = unknown
         ? 'A leitura de códigos entra na próxima etapa'
         : 'Lido da ECU';
@@ -677,6 +681,125 @@ class _LiveDotState extends State<_LiveDot>
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Botão de ação no centro do medidor, mostrado quando não há leitura.
+/// Disco com verde bem claro, ícone e texto em destaque, e um anel de sinal
+/// que se expande. O rótulo realça junto com o anel.
+class _GaugeConnectButton extends StatefulWidget {
+  final bool isDark;
+
+  const _GaugeConnectButton({required this.isDark});
+
+  @override
+  State<_GaugeConnectButton> createState() => _GaugeConnectButtonState();
+}
+
+class _GaugeConnectButtonState extends State<_GaugeConnectButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ripple = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _ripple.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    // Verde bem claro no tema claro; verde-água translúcido no escuro.
+    final discColor = isDark
+        ? const Color(0xFF5EEAD4).withValues(alpha: 0.14)
+        : const Color(0xFF0F766E).withValues(alpha: 0.10);
+    final accent = isDark ? const Color(0xFF5EEAD4) : const Color(0xFF0F766E);
+    // Tom de realce do texto: um verde mais vivo (claro) ou quase branco (escuro).
+    final highlight = isDark ? Colors.white : const Color.fromARGB(255, 73, 168, 162);
+    final subColor = isDark ? Colors.white70 : const Color(0xFF64748B);
+
+    return SizedBox(
+      width: 132,
+      height: 132,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Anel de sinal: expande e some em loop.
+          AnimatedBuilder(
+            animation: _ripple,
+            builder: (context, _) {
+              final t = _ripple.value;
+              final size = 112 + 24 * t;
+              return Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: accent.withValues(alpha: 0.35 * (1 - t)),
+                    width: 2,
+                  ),
+                ),
+              );
+            },
+          ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ConnectionPage()),
+              ),
+              child: Container(
+                width: 112,
+                height: 112,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: discColor,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.bluetooth_rounded, color: accent, size: 30),
+                    const SizedBox(height: 6),
+                    // Rótulo que realça junto com o anel: no meio da expansão
+                    // a cor se aproxima do tom de realce e volta ao base.
+                    AnimatedBuilder(
+                      animation: _ripple,
+                      builder: (context, _) {
+                        final intensity = math.sin(_ripple.value * math.pi);
+                        return Text(
+                          'Conectar',
+                          style: TextStyle(
+                            color: Color.lerp(accent, highlight, intensity),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 3
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'OBD2',
+                      style: TextStyle(
+                        color: accent.withValues(alpha: 0.9),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
