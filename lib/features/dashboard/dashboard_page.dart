@@ -720,7 +720,6 @@ class _GaugeConnectButtonState extends State<_GaugeConnectButton>
     final accent = isDark ? const Color(0xFF5EEAD4) : const Color(0xFF0F766E);
     // Tom de realce do texto: um verde mais vivo (claro) ou quase branco (escuro).
     final highlight = isDark ? Colors.white : const Color.fromARGB(255, 73, 168, 162);
-    final subColor = isDark ? Colors.white70 : const Color(0xFF64748B);
 
     return SizedBox(
       width: 132,
